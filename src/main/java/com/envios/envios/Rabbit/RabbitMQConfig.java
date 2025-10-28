@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     // --- Exchange para flujo de órdenes para crear shipment ---
-    public static final String ORDER_EXCHANGE = "sell_flow";
+    public static final String ORDER_EXCHANGE = "order_placed";
     public static final String ORDER_PAID_QUEUE = "order_paid_queue";
     public static final String ORDER_PAID_ROUTING_KEY = "order_placed";
 
@@ -24,23 +24,22 @@ public class RabbitMQConfig {
     
     // Exchange tipo Topic ORDEN A SHIPMENT
     @Bean
-    public TopicExchange orderExchange() {
-        return new TopicExchange(ORDER_EXCHANGE);
+    public FanoutExchange orderExchange() {
+        return new FanoutExchange(ORDER_EXCHANGE, false, false);
     }
 
     // --- Declaración de cola ORDEN A SHIPMENT---
     @Bean
     public Queue orderPaidQueue() {
-        return new Queue(ORDER_PAID_QUEUE, true);
+        return new Queue(ORDER_PAID_QUEUE, false);
     }
 
 
     // --- Bindings ORDEN A SHIPMENT---
     @Bean
-    public Binding orderPaidBinding(Queue orderPaidQueue, TopicExchange orderExchange) {
+    public Binding orderPaidBinding(Queue orderPaidQueue, FanoutExchange orderExchange) {
         return BindingBuilder.bind(orderPaidQueue)
-                .to(orderExchange)
-                .with(ORDER_PAID_ROUTING_KEY);
+                .to(orderExchange);
     }
 
     // Exchange tipo Topic SHIPMENT ACTUALIZAR ESTADO
