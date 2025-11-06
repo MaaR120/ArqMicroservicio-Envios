@@ -90,4 +90,77 @@ Este microservicio se comunica con los demás del ecosistema del e-commerce a tr
     * Si el `shipmentId` no existe, el sistema devuelve un `404 Not Found`.
 
 ### 5. CU: Actualizar Envío (vía RabbitMQ)
-**Descripción:** Un servicio externo puede solicitar
+**Descripción:** Un servicio externo puede solicitar una actualización de un envío de forma asíncrona publicando un mensaje en el *exchange* de `ShipmentMS`.
+
+* **Precondición:** El `Shipment` debe existir.
+* **Entradas:** Mensaje de RabbitMQ (DTO: `ShipmentUpdateMessage`) con `shipmentId`, `estado` (opcional) y `transportista` (opcional).
+* **Resultado:** El `Shipment` se actualiza en la base de datos.
+* **Camino Normal:**
+    1.  El consumidor `ShipmentConsumer` escucha un mensaje en la cola `shipment_status_update_queue`.
+    2.  El sistema verifica que el `Shipment` (por `shipmentId`) existe.
+    3.  El sistema actualiza los campos no nulos del DTO.
+    4.  El sistema guarda los cambios en MongoDB.
+* **Camino Alternativo:**
+    * Si el `shipmentId` no existe, el servicio lanza una `RuntimeException` (manejada por el consumidor para evitar *poison messages*).
+
+---
+
+## 🌐 Interfaz REST
+
+### Consultar Envío por ID
+`GET /shipments/{id}`
+
+* **Path Parameters**
+    * `id` (String): ID del envío (MongoDB ID).
+
+* **Response `200 OK`**
+    ```json
+    {
+      "id": "690008e0f892cfa5ed6114a1",
+      "orderId": "ORD-1006",
+      "direccion": "Avenida Siempre Viva 742",
+      "transportista": "CORREO_ARGENTINO",
+      "estado": "ENVIADO",
+      "trackingCode": "a1b2c3d4-e5f6-7890-g1h2-i3j4k5l6m7n8",
+      "costo": 1500.0
+    }
+    ```
+* **Otras responses**
+    * `404 Not Found` si el ID no existe.
+
+### Consultar Envío por ID de Orden
+`GET /shipments/order/{orderId}`
+
+* **Path Parameters**
+    * `orderId` (String): ID de la orden asociada.
+
+* **Response `200 OK`**
+    (Idéntica a la respuesta anterior)
+
+* **Otras responses**
+    * `404 Not Found` si el `orderId` no está asociado a ningún envío.
+
+### Actualizar Envío (Parcial)
+`PATCH /shipments/{id}`
+
+* **Path Parameters**
+    * `id` (String): ID del envío (MongoDB ID) a actualizar.
+
+* **Body (DTO: `ShipmentUpdateDTO`)**
+    ```json
+    {
+      "estado": "ENTREGADO",
+      "transportista": null
+    }
+    ```
+    *O (solo transportista):*
+    ```json
+
+    {
+      "transportista": "ANDREANI"
+    }
+    ```
+
+* **Response**
+    * `200 OK`: Devuelve el objeto `Shipment` completo y actualizado.
+    * `404 Not Found`: Si el `id` del envío no existe.
