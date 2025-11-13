@@ -4,7 +4,7 @@ Microservicio presentado como caso de estudio para el e-commerce de la cátedra 
 
 Se encarga de gestionar el ciclo de vida de los **envíos (shipments)** de los pedidos del e-commerce.
 
-Su responsabilidad principal es crear un nuevo envío automáticamente cuando una orden es marcada como pagada. Además, permite consultar el estado de los envíos y actualizarlos (cambiando su estado o transportista) tanto por una API REST como por mensajería asíncrona.
+Su responsabilidad principal es crear un nuevo envío automáticamente cuando una orden es marcada como pagada. Además, permite consultar el estado de los envíos, visualizar su historial de cambios y actualizarlos (cambiando su estado o transportista) tanto por una API REST como por mensajería asíncrona.
 
 ---
 
@@ -23,6 +23,13 @@ La base de datos del microservicio es almacenada en MongoDB.
 * **trackingCode**: String (UUID)
 * **costo**: Double
 
+#### ShipmentHistory
+* **id**: String (ID de MongoDB)
+* **shipmentId**: String (ID del envío asociado)
+* **estado**: String (Estado en el momento del registro)
+* **fecha**: LocalDateTime (Fecha y hora del cambio)
+* **operador**: String (Descripción del origen del cambio, ej: "Actualización de estado")
+
 ---
 
 ## 🐇 Conexiones a otros Microservicios - RabbitMQ
@@ -30,7 +37,7 @@ La base de datos del microservicio es almacenada en MongoDB.
 Este microservicio se comunica con los demás del ecosistema del e-commerce a través de RabbitMQ.
 
 ### Consumidor de `order_placed`
-`ShipmentMS` escucha el exchange `order_placed` (tipo `fanout`) que es publicado por el microservicio de Órdenes. Cuando recibe un mensaje, crea un nuevo `Shipment` en la base de datos con estado `En_Preparacion`.
+`ShipmentMS` escucha el exchange `order_placed` (tipo `fanout`) que es publicado por el microservicio de Órdenes. Cuando recibe un mensaje, crea un nuevo `Shipment` en la base de datos con estado `En_Preparacion` y genera el primer registro en el historial.
 
 ### Consumidor de `shipment_exchange`
 `ShipmentMS` expone su propio exchange `shipment_exchange` (tipo `direct`) con una cola `shipment_status_update_queue`. Esto permite que otros servicios (o el *testing* manual) envíen comandos de actualización de forma asíncrona para cambiar el `estado` o `transportista` de un envío.
@@ -49,7 +56,7 @@ Este microservicio se comunica con los demás del ecosistema del e-commerce a tr
     1.  El sistema (consumidor `ShipmentConsumer`) escucha el evento `order_placed` en la cola `order_paid_queue`.
     2.  Se extraen `orderId` y `direccion` del mensaje.
     3.  Se verifica (por idempotencia) que no exista ya un envío para esa `orderId`.
-    4.  Se crea un nuevo `Shipment` y se guarda en MongoDB.
+    4.  Se crea un nuevo `Shipment`, se guarda en MongoDB y se registra el evento en `ShipmentHistory`.
 
 ### 2. CU: Consultar Envío por ID
 **Descripción:** Permite a un cliente (otro servicio o un *frontend*) obtener los detalles de un envío específico usando su ID de base de datos.
@@ -80,12 +87,12 @@ Este microservicio se comunica con los demás del ecosistema del e-commerce a tr
 
 * **Precondición:** El `Shipment` debe existir.
 * **Entradas:** `shipmentId` (String), Body (JSON) con `estado` (opcional) y `transportista` (opcional).
-* **Resultado:** El `Shipment` se actualiza en la base de datos.
+* **Resultado:** El `Shipment` se actualiza en la base de datos y se genera un registro histórico si hubo cambio de estado.
 * **Camino Normal:**
     1.  El usuario envía una solicitud `PATCH /shipments/{id}` con el DTO `ShipmentUpdateDTO`.
     2.  El sistema verifica que el `Shipment` existe.
     3.  El sistema actualiza los campos no nulos del DTO en la entidad.
-    4.  El sistema guarda los cambios en MongoDB y devuelve el `Shipment` actualizado.
+    4.  El sistema guarda los cambios en MongoDB, registra el cambio en `ShipmentHistory` y devuelve el `Shipment` actualizado.
 * **Camino Alternativo:**
     * Si el `shipmentId` no existe, el sistema devuelve un `404 Not Found`.
 
@@ -99,9 +106,22 @@ Este microservicio se comunica con los demás del ecosistema del e-commerce a tr
     1.  El consumidor `ShipmentConsumer` escucha un mensaje en la cola `shipment_status_update_queue`.
     2.  El sistema verifica que el `Shipment` (por `shipmentId`) existe.
     3.  El sistema actualiza los campos no nulos del DTO.
-    4.  El sistema guarda los cambios en MongoDB.
+    4.  El sistema guarda los cambios en MongoDB y registra el cambio en `ShipmentHistory`.
 * **Camino Alternativo:**
     * Si el `shipmentId` no existe, el servicio lanza una `RuntimeException` (manejada por el consumidor para evitar *poison messages*).
+
+### 6. CU: Consultar Historial de Estados
+**Descripción:** Permite consultar la traza histórica de cambios de estado de un envío.
+
+* **Entradas:** `shipmentId` (String).
+* **Salida:** Lista de objetos `ShipmentHistory` ordenados por fecha.
+* **Camino Normal:**
+    1.  El usuario envía una solicitud `GET /shipments/{id}/history`.
+    2.  El sistema verifica que el envío exista.
+    3.  El sistema consulta el `ShipmentHistoryRepository` filtrando por `shipmentId`.
+    4.  Se devuelve la lista de cambios.
+* **Camino Alternativo:**
+    * Si el `shipmentId` no existe, se devuelve un `404 Not Found`.
 
 ---
 
@@ -139,6 +159,32 @@ Este microservicio se comunica con los demás del ecosistema del e-commerce a tr
 
 * **Otras responses**
     * `404 Not Found` si el `orderId` no está asociado a ningún envío.
+
+### Consultar Historial de Estados
+`GET /shipments/{id}/history`
+
+* **Path Parameters**
+    * `id` (String): ID del envío.
+
+* **Response `200 OK`**
+    ```json
+    [
+        {
+            "id": "hist1",
+            "shipmentId": "690008e0...",
+            "estado": "En_Preparacion",
+            "fecha": "2025-11-13T10:00:00",
+            "operador": "Creación automática por Orden"
+        },
+        {
+            "id": "hist2",
+            "shipmentId": "690008e0...",
+            "estado": "ENVIADO",
+            "fecha": "2025-11-13T12:30:00",
+            "operador": "Actualización de estado"
+        }
+    ]
+    ```
 
 ### Actualizar Envío (Parcial)
 `PATCH /shipments/{id}`
