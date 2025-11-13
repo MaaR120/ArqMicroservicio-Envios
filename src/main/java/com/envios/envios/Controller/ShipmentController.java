@@ -1,12 +1,14 @@
 package com.envios.envios.Controller;
 
 import com.envios.envios.Entities.Shipment;
+import com.envios.envios.Entities.ShipmentHistory;
 import com.envios.envios.Service.ShipmentService;
 import com.envios.envios.DTO.ShipmentUpdateDTO; // <-- Importar el DTO
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -35,6 +37,17 @@ public class ShipmentController {
                        .orElse(ResponseEntity.notFound().build());
     }
 
+    // GET /shipments/{id}/history  <-- NUEVO ENDPOINT
+    @GetMapping("/{id}/history")
+    public ResponseEntity<List<ShipmentHistory>> getHistory(@PathVariable String id) {
+        try {
+            List<ShipmentHistory> history = shipmentService.getShipmentHistory(id);
+            return ResponseEntity.ok(history);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+    
     // --- ENDPOINT PATCH CORREGIDO ---
 
     // PATCH /shipments/{id}
