@@ -12,23 +12,28 @@ Su responsabilidad principal es crear un nuevo envío automáticamente cuando un
 
 La base de datos del microservicio es almacenada en MongoDB.
 
-### Estructura de Datos
+### 🧩 Estructura de Datos
 
-#### Shipment
-* **id**: String (ID de MongoDB)
-* **orderId**: String (ID de la orden del microservicio de Órdenes)
-* **direccion**: String
-* **transportista**: String (Enum: `Transportista`)
-* **estado**: String (Enum: `EstadoShipment`)
-* **trackingCode**: String (UUID)
-* **costo**: Double
+#### **Shipment**
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id` | String | ID de MongoDB |
+| `orderId` | String | ID de la orden |
+| `direccion` | String | Dirección de entrega |
+| `transportista` | String | Enum `Transportista` |
+| `estado` | String | Enum `EstadoShipment` |
+| `trackingCode` | String | UUID generado automáticamente |
+| `costo` | Double | Costo del envío |
 
-#### ShipmentHistory
-* **id**: String (ID de MongoDB)
-* **shipmentId**: String (ID del envío asociado)
-* **estado**: String (Estado en el momento del registro)
-* **fecha**: LocalDateTime (Fecha y hora del cambio)
-* **operador**: String (Descripción del origen del cambio, ej: "Actualización de estado")
+#### **ShipmentHistory**
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id` | String | ID de MongoDB |
+| `shipmentId` | String | ID del envío |
+| `estado` | String | Estado registrado |
+| `fecha` | LocalDateTime | Fecha del cambio |
+| `operador` | String | Origen del cambio |
+
 
 ---
 
@@ -70,6 +75,7 @@ Este mensaje simula el evento emitido por el microservicio de Órdenes cuando un
   "orderId": "ORD-EJEMPLO-001",
   "direccion": "Calle Falsa 123, Springfield"
 }
+```
 
 ### 2. CU: Consultar Envío por ID
 **Descripción:** Permite a un cliente (otro servicio o un *frontend*) obtener los detalles de un envío específico usando su ID de base de datos.
@@ -137,6 +143,7 @@ Este mensaje simula el evento emitido por el microservicio de Órdenes cuando un
   "estado": "EN_CAMINO",
   "transportista": "ANDREANI"
 }
+```
 
 ### 6. CU: Consultar Historial de Estados
 **Descripción:** Permite consultar la traza histórica de cambios de estado de un envío.
