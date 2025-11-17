@@ -129,7 +129,7 @@ Este mensaje simula el evento emitido por el microservicio de Órdenes cuando un
 * **Camino Alternativo:**
     * Si el `shipmentId` no existe, el servicio lanza una `RuntimeException` (manejada por el consumidor para evitar *poison messages*).
 
-Este mensaje simula el evento emitido por el microservicio de Órdenes cuando una compra es pagada.
+Este mensaje simula el evento emitido por el microservicio para Actualizar un Shipment.
 
 * **Exchange**: `shipment_exchange`
 * **Type**: `direct`
