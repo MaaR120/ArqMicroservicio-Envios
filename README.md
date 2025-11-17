@@ -57,6 +57,19 @@ Este microservicio se comunica con los demás del ecosistema del e-commerce a tr
     2.  Se extraen `orderId` y `direccion` del mensaje.
     3.  Se verifica (por idempotencia) que no exista ya un envío para esa `orderId`.
     4.  Se crea un nuevo `Shipment`, se guarda en MongoDB y se registra el evento en `ShipmentHistory`.
+  
+Este mensaje simula el evento emitido por el microservicio de Órdenes cuando una compra es pagada.
+
+* **Exchange**: `order_placed`
+* **Type**: `fanout`
+* **Routing Key**: *(Vacía)*
+* **Payload (JSON)**:
+```json
+{
+  "__TypeId__": "com.envios.envios.DTO.OrderPlacedMessage",
+  "orderId": "ORD-EJEMPLO-001",
+  "direccion": "Calle Falsa 123, Springfield"
+}
 
 ### 2. CU: Consultar Envío por ID
 **Descripción:** Permite a un cliente (otro servicio o un *frontend*) obtener los detalles de un envío específico usando su ID de base de datos.
@@ -109,6 +122,21 @@ Este microservicio se comunica con los demás del ecosistema del e-commerce a tr
     4.  El sistema guarda los cambios en MongoDB y registra el cambio en `ShipmentHistory`.
 * **Camino Alternativo:**
     * Si el `shipmentId` no existe, el servicio lanza una `RuntimeException` (manejada por el consumidor para evitar *poison messages*).
+
+Este mensaje simula el evento emitido por el microservicio de Órdenes cuando una compra es pagada.
+
+* **Exchange**: `shipment_exchange`
+* **Type**: `direct`
+* **Routing Key**: `shipment.updateStatus`
+* **Payload (JSON)**:
+
+```json
+{
+  "__TypeId__": "com.envios.envios.DTO.ShipmentUpdateMessage",
+  "shipmentId": "654321abcdef1234567890ab",
+  "estado": "EN_CAMINO",
+  "transportista": "ANDREANI"
+}
 
 ### 6. CU: Consultar Historial de Estados
 **Descripción:** Permite consultar la traza histórica de cambios de estado de un envío.
@@ -210,3 +238,5 @@ Este microservicio se comunica con los demás del ecosistema del e-commerce a tr
 * **Response**
     * `200 OK`: Devuelve el objeto `Shipment` completo y actualizado.
     * `404 Not Found`: Si el `id` del envío no existe.
+ 
+
